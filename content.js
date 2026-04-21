@@ -1,132 +1,126 @@
 /**
- * Extension for Elbit Career Website
- * Logic: Use incremental scrolling to "wake up" the site and click 'Load More'.
+ * Elbit Careers Automation Tool
+ * Features: Auto-expansion, Experience Filtering, Persistent Click Tracking
  */
 
 (function () {
-  // -----------------------------
-  // UI Banner
-  // -----------------------------
-  const showBanner = (text) => {
-    let banner = document.querySelector(".elbit-extension-banner");
-    if (!banner) {
-      banner = document.createElement("div");
-      banner.className = "elbit-extension-banner";
-      document.body.appendChild(banner);
+  // --- 1. Display Information Banner ---
+  const showBanner = () => {
+    if (document.querySelector(".elbit-extension-banner")) return;
+    const banner = document.createElement("div");
+    banner.className = "elbit-extension-banner";
+    banner.innerHTML = `
+      <button class="elbit-banner-close" onclick="this.parentElement.remove()">&times;</button>
+      <div>🟢 תוסף אלביט פעיל:</div>
+      <div>משרות שלחצת עליהן</div>
+      <div>יסומנו בירוק קבוע</div>
+    `;
+    document.body.appendChild(banner);
+  };
+
+  // --- 2. Save Clicked Job ID to Local Storage ---
+  const markJobAsClicked = (jid) => {
+    if (!jid) return;
+    let clickedJobs = JSON.parse(localStorage.getItem('elbit_clicked_jobs') || '[]');
+    if (!clickedJobs.includes(jid)) {
+      clickedJobs.push(jid);
+      localStorage.setItem('elbit_clicked_jobs', JSON.stringify(clickedJobs));
+      console.log(`LOG: Job ${jid} marked as visited.`);
     }
-    banner.textContent = text;
   };
 
-  showBanner("🟢 תוסף אלביט פעיל: טעינה אוטומטית של כל המשרות על ידי הקלקה חוזרת על כפתור 'תוצאות חיפוש נוספות'.");
-
-  // -----------------------------
-  // 1. Human-like Incremental Scroll
-  // -----------------------------
-  const smoothScrollToBottom = (callback) => {
-    const scrollStep = 400; // Pixels per jump
-    const scrollDelay = 50; // Milliseconds between jumps
-
-    const scrollInterval = setInterval(() => {
-      const currentScroll = window.scrollY + window.innerHeight;
-      const maxScroll = document.documentElement.scrollHeight;
-
-      // Stop if we are near the bottom or found the button
-      const loadMoreBtn = Array.from(document.querySelectorAll('button.MuiButton-root'))
-        .find(btn => btn.textContent.includes("תוצאות חיפוש נוספות"));
-
-      if (currentScroll >= maxScroll - 100 || loadMoreBtn) {
-        clearInterval(scrollInterval);
-        if (callback) callback(loadMoreBtn);
-      } else {
-        window.scrollBy(0, scrollStep);
-      }
-    }, scrollDelay);
-  };
-
-  // -----------------------------
-  // 2. Recursive Expand Logic
-  // -----------------------------
-  const expandAll = () => {
-    smoothScrollToBottom((btn) => {
-      if (btn) {
-        console.log("LOG: Button found. Triggering click chain.");
-        
-        // Ensure the button is centered before clicking
-        btn.scrollIntoView({ block: "center" });
-
-        // Dispatch comprehensive event chain for Material UI
-        const events = ['mouseenter', 'mouseover', 'mousedown', 'mouseup', 'click'];
-        events.forEach(type => {
-          btn.dispatchEvent(new MouseEvent(type, { 
-            bubbles: true, 
-            cancelable: true, 
-            view: window,
-            buttons: 1 
-          }));
-        });
-
-        // Wait for next batch and repeat
-        setTimeout(expandAll, 1500);
-      } else {
-        const loader = document.querySelector('.MuiCircularProgress-root');
-        if (loader) {
-          console.log("LOG: Site is loading, retrying in 2s...");
-          setTimeout(expandAll, 2000);
-        } else {
-          console.log("LOG: Finish. No more buttons found.");
-          showBanner("✅ All jobs loaded and filtered.");
-          processJobs();
-        }
-      }
-    });
-  };
-
-  // -----------------------------
-  // 3. Filter & Mark Jobs
-  // -----------------------------
+  // --- 3. Process, Filter, and Style Job Cards ---
   const processJobs = () => {
     const jobs = document.querySelectorAll(".MuiCard-root");
-    const highExpRegex = /שנתיים|שלוש|ארבע|חמש|שש|שבע|שמונה|תשע|עשר|מנוסה|Senior|Lead|Principal/i;
-    const juniorFriendlyRegex = /ג'וניור|Junior|ללא ניסיון|0-1|שנה ניסיון|סטודנט/i;
+    const clickedInStorage = JSON.parse(localStorage.getItem('elbit_clicked_jobs') || '[]');
+    
+    // Regex for high experience and junior terms
+    const highExpRegex = /שנתיים|שלוש|ארבע|חמש|שש|שבע|Senior|Lead|Principal|מנוסה/i;
+    const juniorTerms = /ג'וניור|Junior|ללא ניסיון|0-1|סטודנט/i;
 
     jobs.forEach((job) => {
+      const text = job.innerText;
+      const idMatch = text.match(/(\d{4,6})/);
+      const jid = idMatch ? idMatch[1] : null;
+
+      // Check if job was previously clicked/applied
+      if (jid && clickedInStorage.includes(jid)) {
+        job.classList.add("job-applied");
+      }
+
+      // Bind click event to save state (using mousedown for faster capture)
+      if (job.dataset.clickBound !== "true") {
+        job.addEventListener('mousedown', () => {
+          if (jid) markJobAsClicked(jid);
+          job.classList.add("job-applied"); // Visual feedback
+        });
+        job.dataset.clickBound = "true";
+      }
+
       if (job.dataset.processed === "true") return;
 
-      const text = job.innerText;
+      // Experience filtering logic
       let shouldHide = false;
-
-      const hasDegree = /תואר|degree/i.test(text);
-      const isJunior = juniorFriendlyRegex.test(text);
-
+      const isJunior = juniorTerms.test(text);
       if (!isJunior) {
         if (highExpRegex.test(text)) shouldHide = true;
         const numMatch = text.match(/(\d+)\s*(?:\+|שנים|years|שנות)/i);
         if (numMatch && parseInt(numMatch[1], 10) > 1) shouldHide = true;
       }
 
-      if (shouldHide || (hasDegree && !isJunior)) {
+      if (shouldHide && !isJunior) {
         job.classList.add("job-filtered");
-      }
-
-      const appliedText = ["הגשת מועמדות", "בוצעה", "הוגשה", "כבר הגשת"];
-      if (appliedText.some(t => text.includes(t))) {
-        job.classList.add("job-applied");
       }
 
       job.dataset.processed = "true";
     });
   };
 
-  // Start the process when the first button appears after initial loader
-  const checkInitialLoad = setInterval(() => {
-    const initialBtn = Array.from(document.querySelectorAll('button.MuiButton-root'))
-      .find(btn => btn.textContent.includes("תוצאות חיפוש נוספות"));
+  // --- 4. Recursive Auto-Expansion Logic ---
+  let isExpanding = false;
+  const autoExpand = () => {
+    if (isExpanding) return;
     
-    if (initialBtn) {
-      clearInterval(checkInitialLoad);
-      console.log("LOG: Initial batch loaded. Starting auto-scroll.");
-      expandAll();
-    }
-  }, 2000);
+    // Find the "Load More" button by its Hebrew text
+    const loadMoreBtn = Array.from(document.querySelectorAll('button.MuiButton-root'))
+      .find(btn => btn.textContent.includes("תוצאות חיפוש נוספות"));
 
+    if (loadMoreBtn) {
+      isExpanding = true;
+      loadMoreBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      setTimeout(() => {
+        // Dispatch multiple click events to bypass React/SPA handlers
+        ['mousedown', 'mouseup', 'click'].forEach(t => {
+            loadMoreBtn.dispatchEvent(new MouseEvent(t, { 
+                bubbles: true, 
+                cancelable: true, 
+                view: window, 
+                buttons: 1 
+            }));
+        });
+
+        setTimeout(() => { 
+          isExpanding = false; 
+          autoExpand(); // Recursive call for next batch
+        }, 2500);
+      }, 1000);
+    } else {
+      processJobs();
+    }
+  };
+
+  // Initialize
+  showBanner();
+  
+  // Start initial expansion after page load
+  setTimeout(autoExpand, 5000);
+
+  // Monitor DOM changes for navigation or infinite scroll
+  const observer = new MutationObserver(() => {
+    processJobs();
+    if (!isExpanding) autoExpand();
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true });
 })();
