@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "elbit chrome extension",
+  "version": "1.0",
+  "description": "Fileters out job search results",
+  "action": {},
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["storage", "tabs", "activeTab"],
+  "host_permissions": ["https://*/*", "http://*/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://elbitsystemscareer.com/jobs/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

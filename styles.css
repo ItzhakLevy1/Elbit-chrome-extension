@@ -1,0 +1,39 @@
+/* Banner styles */
+.elbit-extension-banner {
+    position: fixed;
+    top: 15px;
+    right: 15px;
+    background: #1a73e8;
+    color: white;
+    padding: 12px 20px;
+    z-index: 10000;
+    border-radius: 8px;
+    font-family: system-ui, -apple-system, sans-serif;
+    direction: rtl;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.elbit-banner-close {
+    cursor: pointer;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+/* Job filtering styles */
+.job-filtered {
+    opacity: 0.2 !important;
+    filter: grayscale(1) !important;
+    pointer-events: none !important;
+}
+
+/* Applied jobs indicator */
+.job-applied {
+    border: 2px solid #4caf50 !important;
+    background-color: #f1f8e9 !important;
+}
